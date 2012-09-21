@@ -1,4 +1,4 @@
-package edu.jhu.cvrg.nexus.utilities;
+package org.globusonline.nexus.utilities;
 /*
 Copyright 2012 Johns Hopkins University Institute for Computational Medicine
 Based upon the GlobusOnline Nexus Client written in Python by Mattias Lidman  
@@ -21,35 +21,40 @@ limitations under the License.
 * 
 */
 import java.security.interfaces.RSAPublicKey;
-import java.util.HashMap;
-import java.util.Map;
 
-public class InMemoryCache implements NexusCache{
+import org.apache.log4j.Logger;
 
-//    Simple cache implementation for signing certificates.
+public class LoggingCacheWrapper {
 
-	Map<String, RSAPublicKey> cacheMap;
+	private NexusCache cache;
+	static org.apache.log4j.Logger logger = Logger.getLogger(LoggingCacheWrapper.class);
 	
-	public InMemoryCache(){
-		init();
+	public LoggingCacheWrapper(NexusCache cache){
+		init(cache);
 	}
-
-    private void init(){
-        cacheMap = new HashMap<String, RSAPublicKey>();
+	
+    private void init(NexusCache cache){
+        this.cache = cache;
     }
 
     public void savePublicKey(String keyId, RSAPublicKey key){
-        this.cacheMap.put(keyId, key);
+    	String cacheType = cache.getClass().getName();
+    	
+        String message = cacheType + ": Saving public key " + keyId + ":" + key.toString();
+        logger.debug(message);
+        cache.savePublicKey(keyId, key);
     }
 
     public boolean hasPublicKey(String keyId){
-        return this.cacheMap.containsKey(keyId);
+        return cache.hasPublicKey(keyId);
     }
-
+    
     public RSAPublicKey getPublicKey(String keyId){
+    	String cacheType = cache.getClass().getName();
+    	
+    	String message = cacheType + ": Getting public key " + keyId;
 
-    	RSAPublicKey rsaKey = cacheMap.get(keyId);   	
-        return rsaKey;
+        logger.debug(message);
+        return cache.getPublicKey(keyId);
     }
-	
 }

@@ -1,4 +1,4 @@
-package edu.jhu.cvrg.nexus.utilities;
+package org.globusonline.nexus.utilities;
 
 public class TokenUtilities {
 //

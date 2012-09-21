@@ -1,4 +1,4 @@
-package edu.jhu.cvrg.nexus;
+package org.globusonline.nexus;
 /*
 Copyright 2012 Johns Hopkins University Institute for Computational Medicine
 Based upon the GlobusOnline Nexus Client written in Python by Mattias Lidman  

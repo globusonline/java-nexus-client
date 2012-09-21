@@ -1,4 +1,4 @@
-package edu.jhu.cvrg.nexus.utilities;
+package org.globusonline.nexus.utilities;
 /*
 Copyright 2012 Johns Hopkins University Institute for Computational Medicine
 

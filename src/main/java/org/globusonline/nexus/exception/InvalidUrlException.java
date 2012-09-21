@@ -1,4 +1,4 @@
-package edu.jhu.cvrg.nexus.exception;
+package org.globusonline.nexus.exception;
 
 public class InvalidUrlException extends Exception {
 

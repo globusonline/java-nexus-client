@@ -1,9 +1,4 @@
-package edu.jhu.cvrg.nexus.utilities;
-
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-
+package org.globusonline.nexus.utilities;
 /*
 Copyright 2012 Johns Hopkins University Institute for Computational Medicine
 Based upon the GlobusOnline Nexus Client written in Python by Mattias Lidman  
@@ -25,31 +20,36 @@ limitations under the License.
 * @author Chris Jurado
 * 
 */
-public class DictObj {
-//    Simple dictionary wrapper
+import java.security.interfaces.RSAPublicKey;
+import java.util.HashMap;
+import java.util.Map;
 
-	private Map<String, String> delegate;
+public class InMemoryCache implements NexusCache{
+
+//    Simple cache implementation for signing certificates.
+
+	Map<String, RSAPublicKey> cacheMap;
 	
-    private void init(String delegate){
-        this.delegate = new HashMap<String, String>();
+	public InMemoryCache(){
+		init();
+	}
+
+    private void init(){
+        cacheMap = new HashMap<String, RSAPublicKey>();
     }
 
-    public int len(){
-        return delegate.size();
-    }
-    
-//    public  Iterator<?> iter(){
-//        return this.delegate.__iter__()
-//    }
-
-    public String getItem(String item){
-        return this.delegate.get(item);
+    public void savePublicKey(String keyId, RSAPublicKey key){
+        this.cacheMap.put(keyId, key);
     }
 
-//    def __getattr__(self, attrname):
-//        try:
-//            return self.delegate[attrname]
-//        except KeyError:
-//            raise AttributeError()
+    public boolean hasPublicKey(String keyId){
+        return this.cacheMap.containsKey(keyId);
+    }
+
+    public RSAPublicKey getPublicKey(String keyId){
+
+    	RSAPublicKey rsaKey = cacheMap.get(keyId);   	
+        return rsaKey;
+    }
 	
 }
