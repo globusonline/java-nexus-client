@@ -13,7 +13,6 @@ import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
-import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import javax.xml.bind.DatatypeConverter;
@@ -37,26 +36,29 @@ public class GoauthClient {
 
 	// Create a trust manager that does not validate certificate chains
 	static TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
+		@Override
 		public X509Certificate[] getAcceptedIssuers() {
 			return null;
 		}
 
+		@Override
 		public void checkClientTrusted(X509Certificate[] certs, String authType) {
 			return;
 		}
 
+		@Override
 		public void checkServerTrusted(X509Certificate[] certs, String authType) {
 			return;
 		}
 	} };
-	
+
 	// Create all-trusting host name verifier
 	HostnameVerifier allHostsValid = new HostnameVerifier() {
+		@Override
 		public boolean verify(String hostname, SSLSession session) {
 			return true;
 		}
 	};
-
 
 	static org.apache.log4j.Logger logger = Logger
 			.getLogger(GoauthClient.class);
@@ -126,6 +128,14 @@ public class GoauthClient {
 		return loginUrl;
 	}
 
+	/**
+	 * Takes an authorization code and exchanges it for an access token
+	 * 
+	 * @param code
+	 * @return
+	 * @throws UnsupportedEncodingException
+	 * @throws NexusClientException
+	 */
 	public JSONObject exchangeAuthCodeForAccessToken(String code)
 			throws UnsupportedEncodingException, NexusClientException {
 		String path = "/goauth/token?grant_type=authorization_code" + "&code="
@@ -133,7 +143,42 @@ public class GoauthClient {
 		return issueRestRequest(path);
 	}
 
-	private JSONObject issueRestRequest(String path) throws NexusClientException {
+	/**
+	 * Issue an access token for a request conforming to the Client Credentials
+	 * Grant flow described in section 4.4 of the OAuth 2.0 specification. This
+	 * is allowing a client to create an access token for their own resources.
+	 * 
+	 * @return
+	 * @throws NexusClientException
+	 */
+	public JSONObject getClientOnlyAccessToken() throws NexusClientException {
+		String path = "/goauth/token?grant_type=client_credentials";
+		return issueRestRequest(path);
+	}
+
+	/**
+	 * Validate a token and return a json object representing the fields
+	 * associated with this access token.
+	 * 
+	 * @param token
+	 * @return
+	 * @throws UnsupportedEncodingException
+	 * @throws NexusClientException
+	 */
+	public JSONObject validateAccessToken(String token)
+			throws UnsupportedEncodingException, NexusClientException {
+		String path = "/goauth/validate?token="
+				+ URLEncoder.encode(token, "UTF-8");
+		return issueRestRequest(path);
+	}
+
+	/**
+	 * @param path
+	 * @return JSON Response from action
+	 * @throws NexusClientException
+	 */
+	private JSONObject issueRestRequest(String path)
+			throws NexusClientException {
 
 		JSONObject json = null;
 
@@ -145,18 +190,18 @@ public class GoauthClient {
 		int responseCode;
 
 		try {
-			
+
 			URL url = new URL("https://" + nexusApiHost + path);
 
 			connection = (HttpsURLConnection) url.openConnection();
-			
+
 			if (ignoreCertErrors) {
 				SSLContext sc = SSLContext.getInstance("SSL");
 				sc.init(null, trustAllCerts, new SecureRandom());
 				connection.setSSLSocketFactory(sc.getSocketFactory());
 				connection.setHostnameVerifier(allHostsValid);
 			}
-			
+
 			connection.setDoOutput(true);
 			connection.setInstanceFollowRedirects(false);
 			connection.setRequestMethod(httpMethod);
@@ -180,7 +225,7 @@ public class GoauthClient {
 
 		logger.info("ConnectionURL: " + connection.getURL());
 
-		if (responseCode == 403) {
+		if (responseCode == 403 || responseCode == 400) {
 			logger.error("Access is denied.  Invalid credentials.");
 			throw new InvalidCredentialsException();
 		}
@@ -200,7 +245,7 @@ public class GoauthClient {
 			BufferedReader in = new BufferedReader(new InputStreamReader(
 					connection.getInputStream()));
 			String decodedString = in.readLine();
-	
+
 			json = new JSONObject(decodedString);
 		} catch (JSONException e) {
 			logger.error("JSON Error", e);
@@ -228,26 +273,36 @@ public class GoauthClient {
 		cli.setIgnoreCertErrors(true);
 
 		try {
-			
+
 			// Generate login url
 			System.out.println("Log in at: "
 					+ cli.getLoginUrl("https://www.example.org"));
-			
-			
+
 			InputStreamReader converter = new InputStreamReader(System.in);
 			BufferedReader in = new BufferedReader(converter);
-			
+
 			// Enter code and exchange for access token
 			System.out.println("Enter the code retrieved from redirect:");
 			String code = in.readLine();
-			
-			
-			JSONObject accessTokenJSON = cli.exchangeAuthCodeForAccessToken(code);
+
+			JSONObject accessTokenJSON = cli
+					.exchangeAuthCodeForAccessToken(code);
 			String accessToken = accessTokenJSON.getString("access_token");
-			
+
+			System.out.println();
 			System.out.println("Your access token is " + accessToken);
+			System.out.println("It is valid for "
+					+ accessTokenJSON.getInt("expires_in") + "seconds.");
 			
+			// We can validate the token by using this call:
+			cli.validateAccessToken(accessToken);
+			System.out.println("Token is valid.");
 			
+			// We can also get client only credentials
+			accessTokenJSON = cli.getClientOnlyAccessToken();
+			accessToken = accessTokenJSON.getString("access_token");
+			System.out.println("Client only access token: " + accessToken);
+
 		} catch (UnsupportedEncodingException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
