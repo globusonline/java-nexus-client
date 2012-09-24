@@ -1,5 +1,7 @@
 package org.globusonline.nexus;
+
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
@@ -7,13 +9,22 @@ import java.net.URLEncoder;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 
+import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import javax.xml.bind.DatatypeConverter;
 
+import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Logger;
+import org.globusonline.nexus.exception.InvalidCredentialsException;
+import org.globusonline.nexus.exception.InvalidUrlException;
+import org.globusonline.nexus.exception.NexusClientException;
+import org.globusonline.nexus.exception.ValueErrorException;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 public class GoauthClient {
@@ -38,6 +49,14 @@ public class GoauthClient {
 			return;
 		}
 	} };
+	
+	// Create all-trusting host name verifier
+	HostnameVerifier allHostsValid = new HostnameVerifier() {
+		public boolean verify(String hostname, SSLSession session) {
+			return true;
+		}
+	};
+
 
 	static org.apache.log4j.Logger logger = Logger
 			.getLogger(GoauthClient.class);
@@ -96,9 +115,10 @@ public class GoauthClient {
 
 	public String getLoginUrl(String redirectUrl, String state)
 			throws UnsupportedEncodingException {
-		String loginUrl = "https://" + this.globusOnlineHost + "/OAuth?response_type=code"
-				+ "&client_id=" + URLEncoder.encode(this.clientId, "UTF-8")
-				+ "&redirect_uri=" + URLEncoder.encode(redirectUrl, "UTF-8");
+		String loginUrl = "https://" + this.globusOnlineHost
+				+ "/OAuth?response_type=code" + "&client_id="
+				+ URLEncoder.encode(this.clientId, "UTF-8") + "&redirect_uri="
+				+ URLEncoder.encode(redirectUrl, "UTF-8");
 
 		if (state != null) {
 			loginUrl += "&state=" + URLEncoder.encode(state, "UTF-8");
@@ -107,13 +127,13 @@ public class GoauthClient {
 	}
 
 	public JSONObject exchangeAuthCodeForAccessToken(String code)
-			throws UnsupportedEncodingException {
+			throws UnsupportedEncodingException, NexusClientException {
 		String path = "/goauth/token?grant_type=authorization_code" + "&code="
 				+ URLEncoder.encode(code, "UTF-8");
 		return issueRestRequest(path);
 	}
 
-	private JSONObject issueRestRequest(String path) {
+	private JSONObject issueRestRequest(String path) throws NexusClientException {
 
 		JSONObject json = null;
 
@@ -121,19 +141,22 @@ public class GoauthClient {
 		String contentType = "application/json";
 		String accept = "application/json";
 
+		HttpsURLConnection connection;
+		int responseCode;
+
 		try {
-			SSLContext sc = SSLContext.getInstance("SSL");
-
-			if (ignoreCertErrors) {
-				sc.init(null, trustAllCerts, new SecureRandom());
-				HttpsURLConnection.setDefaultSSLSocketFactory(sc
-						.getSocketFactory());
-			}
-
+			
 			URL url = new URL("https://" + nexusApiHost + path);
 
-			HttpsURLConnection connection = (HttpsURLConnection) url
-					.openConnection();
+			connection = (HttpsURLConnection) url.openConnection();
+			
+			if (ignoreCertErrors) {
+				SSLContext sc = SSLContext.getInstance("SSL");
+				sc.init(null, trustAllCerts, new SecureRandom());
+				connection.setSSLSocketFactory(sc.getSocketFactory());
+				connection.setHostnameVerifier(allHostsValid);
+			}
+			
 			connection.setDoOutput(true);
 			connection.setInstanceFollowRedirects(false);
 			connection.setRequestMethod(httpMethod);
@@ -143,70 +166,98 @@ public class GoauthClient {
 			// community);
 
 			String userpassword = clientId + ":" + clientPassword;
-			String encodedAuthorization = DatatypeConverter.printBase64Binary(userpassword.getBytes());
+			String encodedAuthorization = DatatypeConverter
+					.printBase64Binary(userpassword.getBytes());
 			connection.setRequestProperty("Authorization", "Basic "
 					+ encodedAuthorization);
 
-			System.out.println("ConnectionURL: " + connection.getURL());
-
-			// if(params != null){
-			// OutputStreamWriter out = new
-			// OutputStreamWriter(connection.getOutputStream());
-			//
-			// if(contentType.equals("application/x-www-form-urlencoded")){
-			// // body = urllib.urlencode(params)
-			// }
-			// else {
-			// body = params.toString();
-			// }
-			// out.write(body);
-			// System.out.println("Body:" + body);
-			// out.close();
-			// }
-
-			if (connection.getResponseCode() == 203) {
-				logger.error("Access is denied.  Invalid credentials.");
-				throw new Exception();
-			}
-			if (connection.getResponseCode() == 204) {
-				logger.error("Authentciation URL invalid.");
-				throw new Exception();
-			}
-			if (connection.getResponseCode() == 500) {
-				logger.error("Internal Server Error.");
-				throw new Exception();
-			}
-			if (connection.getResponseCode() != 200) {
-				System.out.println("Response code is: "
-						+ connection.getResponseCode());
-				throw new Exception();
-			} else {
-
-				BufferedReader in = new BufferedReader(new InputStreamReader(
-						connection.getInputStream()));
-				String decodedString = in.readLine();
-
-				json = new JSONObject(decodedString);
-			}
+			responseCode = connection.getResponseCode();
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			logger.error("Unhandled connection error:", e);
+			throw new ValueErrorException();
+		}
+
+		logger.info("ConnectionURL: " + connection.getURL());
+
+		if (responseCode == 403) {
+			logger.error("Access is denied.  Invalid credentials.");
+			throw new InvalidCredentialsException();
+		}
+		if (responseCode == 404) {
+			logger.error("URL not found.");
+			throw new InvalidUrlException();
+		}
+		if (responseCode == 500) {
+			logger.error("Internal Server Error.");
+			throw new ValueErrorException();
+		}
+		if (responseCode != 200) {
+			logger.info("Response code is: " + responseCode);
+		}
+
+		try {
+			BufferedReader in = new BufferedReader(new InputStreamReader(
+					connection.getInputStream()));
+			String decodedString = in.readLine();
+	
+			json = new JSONObject(decodedString);
+		} catch (JSONException e) {
+			logger.error("JSON Error", e);
+			throw new ValueErrorException();
+		} catch (IOException e) {
+			logger.error("IO Error", e);
+			throw new ValueErrorException();
 		}
 
 		return json;
 	}
-	
-	public static void main(String[] args){
-		if (args.length != 4){
-			System.out.println("Usage: java " + GoauthClient.class.getName() + "<api host> <globusonline host> <client_id> <client_password>");
+
+	public static void main(String[] args) {
+		BasicConfigurator.configure();
+		if (args.length != 4) {
+			System.out
+					.println("Usage: java "
+							+ GoauthClient.class.getName()
+							+ "<api host> <globusonline host> <client_id> <client_password>");
 			System.exit(1);
 		}
-		
+
+		// Create the client
 		GoauthClient cli = new GoauthClient(args[0], args[1], args[2], args[3]);
-		
+		cli.setIgnoreCertErrors(true);
+
 		try {
-			System.out.println("Log in at: " + cli.getLoginUrl("https://www.example.org") );
+			
+			// Generate login url
+			System.out.println("Log in at: "
+					+ cli.getLoginUrl("https://www.example.org"));
+			
+			
+			InputStreamReader converter = new InputStreamReader(System.in);
+			BufferedReader in = new BufferedReader(converter);
+			
+			// Enter code and exchange for access token
+			System.out.println("Enter the code retrieved from redirect:");
+			String code = in.readLine();
+			
+			
+			JSONObject accessTokenJSON = cli.exchangeAuthCodeForAccessToken(code);
+			String accessToken = accessTokenJSON.getString("access_token");
+			
+			System.out.println("Your access token is " + accessToken);
+			
+			
 		} catch (UnsupportedEncodingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (NexusClientException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (JSONException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}

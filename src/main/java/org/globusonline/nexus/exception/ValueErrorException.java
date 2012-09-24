@@ -1,6 +1,8 @@
 package org.globusonline.nexus.exception;
 
-public class ValueErrorException extends Exception {
+import org.globusonline.nexus.NexusClient;
+
+public class ValueErrorException extends NexusClientException {
 
 	/**
 	 * 

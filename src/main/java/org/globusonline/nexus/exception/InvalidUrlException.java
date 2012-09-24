@@ -1,5 +1,5 @@
 package org.globusonline.nexus.exception;
 
-public class InvalidUrlException extends Exception {
+public class InvalidUrlException extends NexusClientException {
 
 }
