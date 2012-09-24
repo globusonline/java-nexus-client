@@ -55,6 +55,7 @@
 	  </descriptorRefs>
 	  <archive>                                                                                                                                                                                              
 	    <manifest>                                                                                                                                                                                     
+	      <mainClass>org.globusonline.nexus.GoauthClient</mainClass>
 	      <addClasspath>true</addClasspath>
 	    </manifest>                                                                                                                                                                                    
 	  </archive>                                                                                                                                                                                             
