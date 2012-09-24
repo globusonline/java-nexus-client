@@ -1,33 +1,9 @@
 package org.globusonline.nexus;
-/*
-Copyright 2012 Johns Hopkins University Institute for Computational Medicine
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-/**
-* @author Chris Jurado
-* 
-*/
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 import java.util.UUID;
 
-import org.apache.log4j.Logger;
+import org.globusonline.nexus.exception.NexusClientException;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -41,19 +17,19 @@ public class NexusClient {
 	
 	private JSONObject workingUser = null;
 	
-	public NexusClient(){
+	public NexusClient() throws NexusClientException{
 		
 		initialize();
 		
 	}
 	
-	private void initialize(){
+	private void initialize() throws NexusClientException{
 		
 		restClient = new GlobusOnlineRestClient();
 		
 	}
 	
-	public boolean authenticateUserPassword(String username, String password){
+	public boolean authenticateUserPassword(String username, String password) throws NexusClientException{
 		
 		JSONObject result = restClient.usernamePasswordLogin(username, password);
 		return (result != null);
@@ -61,17 +37,17 @@ public class NexusClient {
 	
 //Public User Operations*******************************************
 	
-	public boolean isEmailValidated(String userId, UUID groupId){
+	public boolean isEmailValidated(String userId, UUID groupId) throws NexusClientException{
 		
 			return isJsonEmailValidated(getWorkingUser(groupId, userId));
 	}
 	
-	public boolean isOptIn(String userId, UUID groupId){
+	public boolean isOptIn(String userId, UUID groupId) throws NexusClientException{
 		
 			return isJsonOptIn(getWorkingUser(groupId, userId));
 	}
 	
-	public String getUserFullname(String userId, UUID groupId){
+	public String getUserFullname(String userId, UUID groupId) throws NexusClientException{
 		
 			return getJsonFullname(getWorkingUser(groupId, userId));
 	}
@@ -80,7 +56,7 @@ public class NexusClient {
 	
 //Public Group Operations******************************************
 	
-	public UUID getRootGroupId(){
+	public UUID getRootGroupId() throws NexusClientException{
 		
 		UUID uuid;
 		String rootId = "";
@@ -98,14 +74,14 @@ public class NexusClient {
 		return uuid;		
 	}
 	
-	public boolean hasChildGroups(UUID rootId){
+	public boolean hasChildGroups(UUID rootId) throws NexusClientException{
 		String depth = "1";
 		JSONObject json = restClient.getGroupList(rootId, depth);
 		
 		return json.has("children");
 	}
 	
-	public List<UUID> getChildGroupIds(UUID rootId){
+	public List<UUID> getChildGroupIds(UUID rootId) throws NexusClientException{
 		
 		String depth = "1";
 		List<UUID> groupList = new ArrayList<UUID>();
@@ -140,7 +116,7 @@ public class NexusClient {
 		return groupList;	
 	}
 	
-	public String getGroupNameById(UUID groupId){
+	public String getGroupNameById(UUID groupId) throws NexusClientException{
 		String name = "";
 		
 		JSONObject group = restClient.getGroupSummary(groupId);
@@ -155,12 +131,12 @@ public class NexusClient {
 		return name;
 	}
 	
-	public UUID getGroupIdByName(String name){
+	public UUID getGroupIdByName(String name) throws NexusClientException{
 		
 		return getGroupIdByName(name, getRootGroupId());
 	}
 	
-	public UUID getGroupIdByName(String name, UUID parentId){//assumes names must be unique	
+	public UUID getGroupIdByName(String name, UUID parentId) throws NexusClientException{//assumes names must be unique	
 		
 		UUID uuid = null;
 		String parentName = "";
@@ -217,7 +193,7 @@ public class NexusClient {
 		return getJsonStringValueFromKey(userObject, "username");
 	}
 		
-	private JSONObject getWorkingUser(UUID groupId, String username){
+	private JSONObject getWorkingUser(UUID groupId, String username) throws NexusClientException{
 		if(this.workingUser == null){
 			this.workingUser = restClient.getGroupMember(groupId, username);
 		}

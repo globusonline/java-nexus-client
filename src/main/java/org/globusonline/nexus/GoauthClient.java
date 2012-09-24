@@ -4,87 +4,29 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
-import java.net.URL;
 import java.net.URLEncoder;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
 
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
-import javax.xml.bind.DatatypeConverter;
 
 import org.apache.log4j.BasicConfigurator;
-import org.apache.log4j.Logger;
-import org.globusonline.nexus.exception.InvalidCredentialsException;
-import org.globusonline.nexus.exception.InvalidUrlException;
 import org.globusonline.nexus.exception.NexusClientException;
 import org.globusonline.nexus.exception.ValueErrorException;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class GoauthClient {
+public class GoauthClient extends BaseNexusRestClient {
 
-	String nexusApiHost = "https://nexus.api.globusonline.org";
 	String globusOnlineHost = "https://www.globusonline.org";
 	String clientId;
 	String clientPassword;
-	boolean ignoreCertErrors = false;
-
-	// Create a trust manager that does not validate certificate chains
-	static TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
-		@Override
-		public X509Certificate[] getAcceptedIssuers() {
-			return null;
-		}
-
-		@Override
-		public void checkClientTrusted(X509Certificate[] certs, String authType) {
-			return;
-		}
-
-		@Override
-		public void checkServerTrusted(X509Certificate[] certs, String authType) {
-			return;
-		}
-	} };
-
-	// Create all-trusting host name verifier
-	HostnameVerifier allHostsValid = new HostnameVerifier() {
-		@Override
-		public boolean verify(String hostname, SSLSession session) {
-			return true;
-		}
-	};
-
-	static org.apache.log4j.Logger logger = Logger
-			.getLogger(GoauthClient.class);
-
-	public String getNexusApiUrl() {
-		return nexusApiHost;
-	}
-
-	public void setNexusApiUrl(String nexusApiHost) {
-		this.nexusApiHost = nexusApiHost;
-	}
-
+	
+	NexusAuthenticator goauthClientAuthenticator;
+	
 	public String getGlobusOnlineUrl() {
 		return globusOnlineHost;
 	}
 
 	public void setGlobusOnlineUrl(String globusOnlineHost) {
 		this.globusOnlineHost = globusOnlineHost;
-	}
-
-	public boolean isIgnoreCertErrors() {
-		return ignoreCertErrors;
-	}
-
-	public void setIgnoreCertErrors(boolean ignoreCertErrors) {
-		this.ignoreCertErrors = ignoreCertErrors;
 	}
 
 	/**
@@ -99,6 +41,12 @@ public class GoauthClient {
 		this.globusOnlineHost = globusOnlineUrl;
 		this.clientId = clientId;
 		this.clientPassword = clientPassword;
+		this.goauthClientAuthenticator = new BasicAuthenticator(clientId, clientPassword);
+	}
+	
+	public void setAccessToken(String token) {
+		NexusAuthenticator auth = new GoauthAuthenticator(token);
+		setAuthenticator(auth);
 	}
 
 	/**
@@ -140,7 +88,14 @@ public class GoauthClient {
 			throws UnsupportedEncodingException, NexusClientException {
 		String path = "/goauth/token?grant_type=authorization_code" + "&code="
 				+ URLEncoder.encode(code, "UTF-8");
-		return issueRestRequest(path);
+		JSONObject response = issueRestRequest(path, goauthClientAuthenticator);
+		try {
+			setAccessToken(response.getString("access_token"));
+		} catch (JSONException e) {
+			logger.error("Error getting access_token", e);
+			throw new ValueErrorException();
+		}
+		return response;
 	}
 
 	/**
@@ -153,7 +108,14 @@ public class GoauthClient {
 	 */
 	public JSONObject getClientOnlyAccessToken() throws NexusClientException {
 		String path = "/goauth/token?grant_type=client_credentials";
-		return issueRestRequest(path);
+		JSONObject response = issueRestRequest(path, goauthClientAuthenticator);
+		try {
+			setAccessToken(response.getString("access_token"));
+		} catch (JSONException e) {
+			logger.error("Error getting access_token", e);
+			throw new ValueErrorException();
+		}
+		return response;
 	}
 
 	/**
@@ -172,91 +134,7 @@ public class GoauthClient {
 		return issueRestRequest(path);
 	}
 
-	/**
-	 * @param path
-	 * @return JSON Response from action
-	 * @throws NexusClientException
-	 */
-	private JSONObject issueRestRequest(String path)
-			throws NexusClientException {
 
-		JSONObject json = null;
-
-		String httpMethod = "GET";
-		String contentType = "application/json";
-		String accept = "application/json";
-
-		HttpsURLConnection connection;
-		int responseCode;
-
-		try {
-
-			URL url = new URL("https://" + nexusApiHost + path);
-
-			connection = (HttpsURLConnection) url.openConnection();
-
-			if (ignoreCertErrors) {
-				SSLContext sc = SSLContext.getInstance("SSL");
-				sc.init(null, trustAllCerts, new SecureRandom());
-				connection.setSSLSocketFactory(sc.getSocketFactory());
-				connection.setHostnameVerifier(allHostsValid);
-			}
-
-			connection.setDoOutput(true);
-			connection.setInstanceFollowRedirects(false);
-			connection.setRequestMethod(httpMethod);
-			connection.setRequestProperty("Content-Type", contentType);
-			connection.setRequestProperty("Accept", accept);
-			// connection.setRequestProperty("X-Go-Community-Context",
-			// community);
-
-			String userpassword = clientId + ":" + clientPassword;
-			String encodedAuthorization = DatatypeConverter
-					.printBase64Binary(userpassword.getBytes());
-			connection.setRequestProperty("Authorization", "Basic "
-					+ encodedAuthorization);
-
-			responseCode = connection.getResponseCode();
-
-		} catch (Exception e) {
-			logger.error("Unhandled connection error:", e);
-			throw new ValueErrorException();
-		}
-
-		logger.info("ConnectionURL: " + connection.getURL());
-
-		if (responseCode == 403 || responseCode == 400) {
-			logger.error("Access is denied.  Invalid credentials.");
-			throw new InvalidCredentialsException();
-		}
-		if (responseCode == 404) {
-			logger.error("URL not found.");
-			throw new InvalidUrlException();
-		}
-		if (responseCode == 500) {
-			logger.error("Internal Server Error.");
-			throw new ValueErrorException();
-		}
-		if (responseCode != 200) {
-			logger.info("Response code is: " + responseCode);
-		}
-
-		try {
-			BufferedReader in = new BufferedReader(new InputStreamReader(
-					connection.getInputStream()));
-			String decodedString = in.readLine();
-
-			json = new JSONObject(decodedString);
-		} catch (JSONException e) {
-			logger.error("JSON Error", e);
-			throw new ValueErrorException();
-		} catch (IOException e) {
-			logger.error("IO Error", e);
-			throw new ValueErrorException();
-		}
-
-		return json;
-	}
 
 	public static void main(String[] args) {
 		BasicConfigurator.configure();
@@ -295,8 +173,13 @@ public class GoauthClient {
 					+ accessTokenJSON.getInt("expires_in") + "seconds.");
 			
 			// We can validate the token by using this call:
-			cli.validateAccessToken(accessToken);
+			JSONObject tokenInfo = cli.validateAccessToken(accessToken);
 			System.out.println("Token is valid.");
+			
+			// Now that we have exchanged the access token, we can do cool things 
+			// like get user info
+			JSONObject userInfo = cli.getUser(tokenInfo.getString("user_name"));
+			System.out.println("Your email is: " + userInfo.getString("email"));
 			
 			// We can also get client only credentials
 			accessTokenJSON = cli.getClientOnlyAccessToken();
