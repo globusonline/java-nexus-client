@@ -1,9 +1,5 @@
 /*
 Copyright 2012 Johns Hopkins University Institute for Computational Medicine
-Copyright 2012 University of Chicago
-
-Based upon the GlobusOnline Nexus Client written in Python by Mattias Lidman  
-available at https://github.com/globusonline/python-nexus-client
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +13,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+/**
+* @author Chris Jurado
+* 
+*/
+
 
 package org.globusonline.nexus;
 import java.util.ArrayList;
