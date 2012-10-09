@@ -50,7 +50,6 @@ import org.globusonline.nexus.exception.InvalidCredentialsException;
 import org.globusonline.nexus.exception.InvalidUrlException;
 import org.globusonline.nexus.exception.NexusClientException;
 import org.globusonline.nexus.exception.ValueErrorException;
-import org.json.Cookie;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -58,8 +57,8 @@ import org.json.JSONObject;
 public class BaseNexusRestClient {
 
 	protected String community;
-	protected JSONObject currentUser;
-	protected String nexusApiHost = "https://nexus.api.globusonline.org";
+	private JSONObject currentUser;
+	protected String nexusApiHost = "nexus.api.globusonline.org";
 	boolean ignoreCertErrors = false;
 	HostnameVerifier allHostsValid = new HostnameVerifier() {
 		@Override
@@ -164,7 +163,7 @@ public class BaseNexusRestClient {
 
 		try {
 
-			JSONObject user = currentUser;
+			JSONObject user = getCurrentUser();
 			JSONObject membership = issueRestRequest(url);
 			membership.put("username", (String) user.get("username"));
 			membership.put("email", (String) user.get("email"));
@@ -242,7 +241,7 @@ public class BaseNexusRestClient {
 	}
 
 	public String getNexusApiUrl() {
-		return nexusApiHost;
+		return "https://" + nexusApiHost;
 	}
 
 	public JSONObject getRenderedGroupEmailTemplate(UUID gid, UUID templateId)
@@ -634,10 +633,14 @@ public class BaseNexusRestClient {
 		this.ignoreCertErrors = ignoreCertErrors;
 	}
 
-	public void setNexusApiUrl(String nexusApiHost) {
+	public void setNexusApiHost(String nexusApiHost) {
 		this.nexusApiHost = nexusApiHost;
 	}
 
+	public String getNexusApiHost() {
+		return this.nexusApiHost;
+	}
+	
 	public JSONObject setSinglePolicy(UUID gid, JSONObject policy,
 			JSONArray newPolicyOptions) throws NexusClientException {
 		// # Wrapper function for easily setting a single policy. For a given
@@ -739,7 +742,7 @@ public class BaseNexusRestClient {
 				"Only suspended members can be unsuspended.", newStatusReason);
 	}
 
-	private NexusAuthenticator getAuthenticator() {
+	protected NexusAuthenticator getAuthenticator() {
 		return authenticator;
 	}
 
@@ -838,7 +841,7 @@ public class BaseNexusRestClient {
 
 		try {
 
-			URL url = new URL("https://" + nexusApiHost + path);
+			URL url = new URL(getNexusApiUrl() + path);
 
 			connection = (HttpsURLConnection) url.openConnection();
 
@@ -915,6 +918,21 @@ public class BaseNexusRestClient {
 
 	protected void setAuthenticator(NexusAuthenticator authenticator) {
 		this.authenticator = authenticator;
+	}
+
+	/**
+	 * @return the currentUser
+	 * @throws NexusClientException 
+	 */
+	public JSONObject getCurrentUser() throws NexusClientException {
+		return currentUser;
+	}
+
+	/**
+	 * @param currentUser the currentUser to set
+	 */
+	protected void setCurrentUser(JSONObject currentUser) {
+		this.currentUser = currentUser;
 	}
 
 }

@@ -1,5 +1,7 @@
 /*
 Copyright 2012 Johns Hopkins University Institute for Computational Medicine
+Copyright 2012 University of Chicago
+
 Based upon the GlobusOnline Nexus Client written in Python by Mattias Lidman  
 available at https://github.com/globusonline/python-nexus-client
 
@@ -31,133 +33,13 @@ import java.net.URLEncoder;
 
 
 import org.apache.log4j.BasicConfigurator;
+import org.globusonline.nexus.exception.InvalidCredentialsException;
 import org.globusonline.nexus.exception.NexusClientException;
 import org.globusonline.nexus.exception.ValueErrorException;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 public class GoauthClient extends BaseNexusRestClient {
-
-	String globusOnlineHost = "https://www.globusonline.org";
-	String clientId;
-	String clientPassword;
-	
-	NexusAuthenticator goauthClientAuthenticator;
-	
-	public String getGlobusOnlineUrl() {
-		return globusOnlineHost;
-	}
-
-	public void setGlobusOnlineUrl(String globusOnlineHost) {
-		this.globusOnlineHost = globusOnlineHost;
-	}
-
-	/**
-	 * @param nexusApiUrl
-	 * @param globusOnlineUrl
-	 * @param clientId
-	 * @param clientPassword
-	 */
-	public GoauthClient(String nexusApiUrl, String globusOnlineUrl,
-			String clientId, String clientPassword) {
-		this.nexusApiHost = nexusApiUrl;
-		this.globusOnlineHost = globusOnlineUrl;
-		this.clientId = clientId;
-		this.clientPassword = clientPassword;
-		this.goauthClientAuthenticator = new BasicAuthenticator(clientId, clientPassword);
-	}
-	
-	public void setAccessToken(String token) {
-		NexusAuthenticator auth = new GoauthAuthenticator(token);
-		setAuthenticator(auth);
-	}
-
-	/**
-	 * @param clientId
-	 * @param clientPassword
-	 */
-	public GoauthClient(String clientId, String clientPassword) {
-		this.clientId = clientId;
-		this.clientPassword = clientPassword;
-	}
-
-	public String getLoginUrl(String redirectUrl)
-			throws UnsupportedEncodingException {
-		return getLoginUrl(redirectUrl, null);
-	}
-
-	public String getLoginUrl(String redirectUrl, String state)
-			throws UnsupportedEncodingException {
-		String loginUrl = "https://" + this.globusOnlineHost
-				+ "/OAuth?response_type=code" + "&client_id="
-				+ URLEncoder.encode(this.clientId, "UTF-8") + "&redirect_uri="
-				+ URLEncoder.encode(redirectUrl, "UTF-8");
-
-		if (state != null) {
-			loginUrl += "&state=" + URLEncoder.encode(state, "UTF-8");
-		}
-		return loginUrl;
-	}
-
-	/**
-	 * Takes an authorization code and exchanges it for an access token
-	 * 
-	 * @param code
-	 * @return
-	 * @throws UnsupportedEncodingException
-	 * @throws NexusClientException
-	 */
-	public JSONObject exchangeAuthCodeForAccessToken(String code)
-			throws UnsupportedEncodingException, NexusClientException {
-		String path = "/goauth/token?grant_type=authorization_code" + "&code="
-				+ URLEncoder.encode(code, "UTF-8");
-		JSONObject response = issueRestRequest(path, goauthClientAuthenticator);
-		try {
-			setAccessToken(response.getString("access_token"));
-		} catch (JSONException e) {
-			logger.error("Error getting access_token", e);
-			throw new ValueErrorException();
-		}
-		return response;
-	}
-
-	/**
-	 * Issue an access token for a request conforming to the Client Credentials
-	 * Grant flow described in section 4.4 of the OAuth 2.0 specification. This
-	 * is allowing a client to create an access token for their own resources.
-	 * 
-	 * @return
-	 * @throws NexusClientException
-	 */
-	public JSONObject getClientOnlyAccessToken() throws NexusClientException {
-		String path = "/goauth/token?grant_type=client_credentials";
-		JSONObject response = issueRestRequest(path, goauthClientAuthenticator);
-		try {
-			setAccessToken(response.getString("access_token"));
-		} catch (JSONException e) {
-			logger.error("Error getting access_token", e);
-			throw new ValueErrorException();
-		}
-		return response;
-	}
-
-	/**
-	 * Validate a token and return a json object representing the fields
-	 * associated with this access token.
-	 * 
-	 * @param token
-	 * @return
-	 * @throws UnsupportedEncodingException
-	 * @throws NexusClientException
-	 */
-	public JSONObject validateAccessToken(String token)
-			throws UnsupportedEncodingException, NexusClientException {
-		String path = "/goauth/validate?token="
-				+ URLEncoder.encode(token, "UTF-8");
-		return issueRestRequest(path);
-	}
-
-
 
 	public static void main(String[] args) {
 		BasicConfigurator.configure();
@@ -208,19 +90,187 @@ public class GoauthClient extends BaseNexusRestClient {
 			accessTokenJSON = cli.getClientOnlyAccessToken();
 			accessToken = accessTokenJSON.getString("access_token");
 			System.out.println("Client only access token: " + accessToken);
+			cli.validateAccessToken(accessToken);
+			
+			// We can also create a client that just uses a token directly without
+			// logging in first.  This is useful if an access token will be received
+			// from elsewhere.
+			cli = new GoauthClient();
+			cli.setIgnoreCertErrors(true);
+			cli.setAccessToken(accessToken);
+			cli.setNexusApiHost(args[0]);
+			cli.setGlobusOnlineHost(args[1]);
+			JSONObject user = cli.getCurrentUser();
+			System.out.println("Clients email is: " + user.getString("email"));
 
-		} catch (UnsupportedEncodingException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		} catch (NexusClientException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (JSONException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	String globusOnlineHost = "https://www.globusonline.org";
+	
+	BasicAuthenticator goauthClientAuthenticator;
+
+	public GoauthClient() {
+		super();
+	}
+
+	/**
+	 * @param clientId
+	 * @param clientPassword
+	 */
+	public GoauthClient(String clientId, String clientPassword) {
+		super();
+		this.goauthClientAuthenticator = new BasicAuthenticator(clientId, clientPassword);
+	}
+	
+	/**
+	 * @param nexusApiUrl
+	 * @param globusOnlineUrl
+	 * @param clientId
+	 * @param clientPassword
+	 */
+	public GoauthClient(String nexusApiUrl, String globusOnlineUrl,
+			String clientId, String clientPassword) {
+		super();
+		this.nexusApiHost = nexusApiUrl;
+		this.globusOnlineHost = globusOnlineUrl;
+		this.goauthClientAuthenticator = new BasicAuthenticator(clientId, clientPassword);
+	}
+	
+	/**
+	 * @return the currentUser
+	 * @throws NexusClientException 
+	 */
+	public JSONObject getCurrentUser() throws NexusClientException {
+		JSONObject user = super.getCurrentUser();
+		if (user == null) {
+			try {
+				GoauthAuthenticator auth = (GoauthAuthenticator)getAuthenticator();
+				JSONObject tokenInfo = validateAccessToken(auth.getAccessToken());
+				String username = tokenInfo.getString("user_name");
+				user = getUser(username);
+			} catch (ClassCastException e) {
+				logger.error("Could not cast authenticator", e);
+				throw new InvalidCredentialsException();
+			} catch (JSONException e) {
+				logger.error("Could not retrieve user name.", e);
+				throw new ValueErrorException();
+			}
+		}
+		return user;
+	}
+	
+	/**
+	 * Takes an authorization code and exchanges it for an access token
+	 * 
+	 * @param code
+	 * @return
+	 * @throws NexusClientException
+	 */
+	public JSONObject exchangeAuthCodeForAccessToken(String code)
+			throws NexusClientException {
+		try {
+			String path = "/goauth/token?grant_type=authorization_code" + "&code="
+					+ URLEncoder.encode(code, "UTF-8");
+			JSONObject response = issueRestRequest(path, goauthClientAuthenticator);
+			setAccessToken(response.getString("access_token"));
+			return response;
+		} catch (JSONException e) {
+			logger.error("Error getting access_token", e);
+			throw new ValueErrorException();
+		} catch (UnsupportedEncodingException e) {
+			logger.error("Unsupported Encoding", e);
+			throw new ValueErrorException();
+		}
+	}
+	
+	/**
+	 * Issue an access token for a request conforming to the Client Credentials
+	 * Grant flow described in section 4.4 of the OAuth 2.0 specification. This
+	 * is allowing a client to create an access token for their own resources.
+	 * 
+	 * @return
+	 * @throws NexusClientException
+	 */
+	public JSONObject getClientOnlyAccessToken() throws NexusClientException {
+		String path = "/goauth/token?grant_type=client_credentials";
+		JSONObject response = issueRestRequest(path, goauthClientAuthenticator);
+		try {
+			setAccessToken(response.getString("access_token"));
+		} catch (JSONException e) {
+			logger.error("Error getting access_token", e);
+			throw new ValueErrorException();
+		}
+		return response;
+	}
+
+	public String getGlobusOnlineHost() {
+		return globusOnlineHost;
+	}
+
+	public String getLoginUrl(String redirectUrl)
+			throws NexusClientException {
+		return getLoginUrl(redirectUrl, null);
+	}
+
+	public String getLoginUrl(String redirectUrl, String state)
+			throws NexusClientException {
+		try{
+			String loginUrl = "https://" + this.globusOnlineHost
+					+ "/OAuth?response_type=code" + "&client_id="
+					+ URLEncoder.encode(this.goauthClientAuthenticator.getClientId(), "UTF-8") + "&redirect_uri="
+					+ URLEncoder.encode(redirectUrl, "UTF-8");
+	
+			if (state != null) {
+				loginUrl += "&state=" + URLEncoder.encode(state, "UTF-8");
+			}
+			return loginUrl;
+		} catch (UnsupportedEncodingException e){
+			logger.error("Unsupported Encoding", e);
+			throw new ValueErrorException();
+		}
+	}
+
+	public void setAccessToken(String token) {
+		NexusAuthenticator auth = new GoauthAuthenticator(token);
+		setAuthenticator(auth);
+		//clear the current user
+		setCurrentUser(null);
+	}
+
+	public void setGlobusOnlineHost(String globusOnlineHost) {
+		this.globusOnlineHost = globusOnlineHost;
+	}
+
+
+
+	/**
+	 * Validate a token and return a json object representing the fields
+	 * associated with this access token.
+	 * 
+	 * @param token
+	 * @return
+	 * @throws NexusClientException
+	 */
+	public JSONObject validateAccessToken(String token)
+			throws NexusClientException {
+		try {
+			String path = "/goauth/validate?token="
+					+ URLEncoder.encode(token, "UTF-8");
+			return issueRestRequest(path);
+		} catch (UnsupportedEncodingException e) {
+			// TODO Auto-generated catch block
+			logger.error("Unsupported Encoding", e);
+			throw new ValueErrorException();
 		}
 	}
 }

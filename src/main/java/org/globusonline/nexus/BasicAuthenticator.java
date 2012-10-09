@@ -30,6 +30,11 @@ public class BasicAuthenticator implements NexusAuthenticator {
 	}
 
 	private String clientId;
+	
+	public String getClientId() {
+		return clientId;
+	}
+
 	private String clientPassword;
 
 	@Override

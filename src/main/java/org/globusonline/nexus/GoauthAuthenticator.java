@@ -29,6 +29,10 @@ public class GoauthAuthenticator implements NexusAuthenticator {
 
 	private String accessToken;
 
+	public String getAccessToken() {
+		return accessToken;
+	}
+
 	@Override
 	public void authenticate(HttpsURLConnection con) {
 		con.setRequestProperty("Authorization", "Globus-Goauthtoken " + accessToken);

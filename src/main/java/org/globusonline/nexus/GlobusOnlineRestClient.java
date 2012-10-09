@@ -83,7 +83,7 @@ public class GlobusOnlineRestClient extends BaseNexusRestClient {
         }
         this.oauthSecret = oauthSecret;
         this.sessionCookies = null;
-        this.currentUser = null;
+        this.setCurrentUser(null);
         if(!username.isEmpty()){
             if(!oauthSecret.isEmpty()){
                 usernameOauthSecretLogin(username, oauthSecret);
@@ -158,10 +158,8 @@ public class GlobusOnlineRestClient extends BaseNexusRestClient {
     	
     	JSONObject content = getUser(username);
     	
-        String oldOauthSecret = oauthSecret;
-        JSONObject oldCurrentUser = currentUser;
         this.oauthSecret = oauthSecret;
-        currentUser = content;
+        setCurrentUser(content);
 
         return content;
     }
@@ -169,7 +167,7 @@ public class GlobusOnlineRestClient extends BaseNexusRestClient {
     public JSONObject logout() throws NexusClientException{
     	
         JSONObject content = issueRestRequest("/logout");
-        currentUser = null;
+        setCurrentUser(null);
         sessionCookies = null;
         oauthSecret = null;
         return content;
