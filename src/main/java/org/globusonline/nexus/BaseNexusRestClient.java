@@ -56,9 +56,11 @@ import org.json.JSONObject;
 
 public class BaseNexusRestClient {
 
-	protected String community;
+	protected String community = "go";
 	private JSONObject currentUser;
+
 	protected String nexusApiHost = "nexus.api.globusonline.org";
+
 	boolean ignoreCertErrors = false;
 	HostnameVerifier allHostsValid = new HostnameVerifier() {
 		@Override
@@ -183,6 +185,18 @@ public class BaseNexusRestClient {
 		return issueRestRequest(url, "PUT", "", "", params);
 	}
 
+	public String getCommunity() {
+		return community;
+	}
+
+	/**
+	 * @return the currentUser
+	 * @throws NexusClientException 
+	 */
+	public JSONObject getCurrentUser() throws NexusClientException {
+		return currentUser;
+	}
+
 	public JSONObject getGroupEmailTemplate(UUID gid, UUID templateId) throws NexusClientException {
 		// # Get a single email template, including message. The template_id can
 		// # be gotten by using get_group_email_templates.
@@ -238,6 +252,10 @@ public class BaseNexusRestClient {
 	public JSONObject getGroupSummary(UUID gid) throws NexusClientException {
 		String url = "/groups/" + gid;
 		return issueRestRequest(url);
+	}
+
+	public String getNexusApiHost() {
+		return this.nexusApiHost;
 	}
 
 	public String getNexusApiUrl() {
@@ -629,18 +647,18 @@ public class BaseNexusRestClient {
 				"Only possible to reject membership for pending users.", "");
 	}
 
+	public void setCommunity(String community) {
+		this.community = community;
+	}
+
 	public void setIgnoreCertErrors(boolean ignoreCertErrors) {
 		this.ignoreCertErrors = ignoreCertErrors;
 	}
-
+	
 	public void setNexusApiHost(String nexusApiHost) {
 		this.nexusApiHost = nexusApiHost;
 	}
 
-	public String getNexusApiHost() {
-		return this.nexusApiHost;
-	}
-	
 	public JSONObject setSinglePolicy(UUID gid, JSONObject policy,
 			JSONArray newPolicyOptions) throws NexusClientException {
 		// # Wrapper function for easily setting a single policy. For a given
@@ -742,10 +760,6 @@ public class BaseNexusRestClient {
 				"Only suspended members can be unsuspended.", newStatusReason);
 	}
 
-	protected NexusAuthenticator getAuthenticator() {
-		return authenticator;
-	}
-
 	private JSONObject putGroupMembership(String url, String username,
 			String email, String role, String status, String statusReason,
 			String userDetails) throws NexusClientException {
@@ -796,6 +810,10 @@ public class BaseNexusRestClient {
 		queryString = queryString.substring(0, queryString.length() - 2);
 
 		return queryString;
+	}
+
+	protected NexusAuthenticator getAuthenticator() {
+		return authenticator;
 	}
 
 	protected JSONObject issueRestRequest(String path)
@@ -918,14 +936,6 @@ public class BaseNexusRestClient {
 
 	protected void setAuthenticator(NexusAuthenticator authenticator) {
 		this.authenticator = authenticator;
-	}
-
-	/**
-	 * @return the currentUser
-	 * @throws NexusClientException 
-	 */
-	public JSONObject getCurrentUser() throws NexusClientException {
-		return currentUser;
 	}
 
 	/**
