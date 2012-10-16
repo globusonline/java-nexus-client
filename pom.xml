@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.globusonline</groupId>
   <artifactId>java_nexus_client</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.0.2-SNAPSHOT</version>
   <name>Globus Nexus Java Client</name>
   <dependencies>                                                                                                                                                                                                                               
     <dependency>

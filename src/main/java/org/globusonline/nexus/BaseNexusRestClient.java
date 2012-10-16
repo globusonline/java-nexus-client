@@ -68,12 +68,10 @@ public class BaseNexusRestClient {
 			return true;
 		}
 	};
-	
 	private NexusAuthenticator authenticator;
-	
 	protected static org.apache.log4j.Logger logger = Logger
 			.getLogger(GlobusOnlineRestClient.class);
-
+	
 	static TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
 		public void checkClientTrusted(X509Certificate[] certs, String authType) {
 			return;
@@ -97,7 +95,7 @@ public class BaseNexusRestClient {
 		return putMembershipStatusWrapper(gid, username, "pending", "invited",
 				"Only invited users can accept an invitation.", "");
 	}
-
+	
 	public JSONObject approveJoin(UUID gid, String username, String statusReason)
 			throws NexusClientException {
 		return putMembershipStatusWrapper(gid, username, "active", "pending",
@@ -696,7 +694,7 @@ public class BaseNexusRestClient {
 
 		return putGroupPolicies(gid, policies);
 	}
-
+	
 	public JSONObject setSinglePolicy(UUID gid, JSONObject policy,
 			String newPolicyOption) throws NexusClientException {
 		// # Wrapper function for easily setting a single policy. For a given
@@ -715,7 +713,7 @@ public class BaseNexusRestClient {
 
 		return setSinglePolicy(gid, policy, newPolicyOptionsArray);
 	}
-	
+
 	public JSONObject simpleCreateUser(String username, String acceptTerms,
 			String optIn) throws NexusClientException {
 		// # Wrapper function that only needs a username to create a user. If
